@@ -27,7 +27,7 @@ public func historyPoint(hw: Hardware, sys: SystemSample, ts: Int64) -> [String:
 }
 
 /// The per-tick snapshot. Without hardware data it carries an `error` string and the UI shows a placeholder.
-public func snapshotDictionary(hw: Hardware?, sys: SystemSample, error: String?, sensorTs: Int64?, ts: Int64, uptime: Int, point: [String: Any]?, intervalMs: Int = 1000) -> [String: Any] {
+public func snapshotDictionary(hw: Hardware?, sys: SystemSample, error: String?, sensorTs: Int64?, ts: Int64, uptime: Int, point: [String: Any]?, intervalMs: Int = 1000, unit: TempUnit = .celsius) -> [String: Any] {
     var s: [String: Any] = [:]
     if let hw = hw {
         for (k, v) in [("cpu", hw.cpu), ("gpu", hw.gpu), ("gpuFreq", hw.gpuFreq), ("gpuPower", hw.gpuPower), ("cpuPower", hw.cpuPower), ("chipPower", hw.chipPower),
@@ -57,6 +57,7 @@ public func snapshotDictionary(hw: Hardware?, sys: SystemSample, error: String?,
     s["ts"] = ts
     s["uptime"] = uptime
     s["intervalMs"] = intervalMs
+    s["unit"] = unit == .fahrenheit ? "F" : "C"
     s["point"] = point ?? null
     return s
 }

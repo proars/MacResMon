@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStream } from './useStream.js';
-import { usePref } from './usePref.js';
 import { evaluateAlerts } from './alerts.js';
 import Ring from './Ring.jsx';
 import Thermometer from './Thermometer.jsx';
@@ -41,8 +40,8 @@ function Cores({ clusters }) {
 export default function App() {
   const { snap, history, online } = useStream();
 
-  // Temperature unit of this window (the menu bar and notifications use the unit set in the app's Settings).
-  const [unit, setUnit] = usePref('unit', 'C');
+  // Temperature unit: set in the app's Settings and sent with every snapshot (menu bar and notifications use it too).
+  const unit = snap.unit === 'F' ? 'F' : 'C';
 
   // The header shows the active alerts; macOS notifications for them come from the native side.
   const alerts = useMemo(() => evaluateAlerts(snap, unit), [snap, unit]);
@@ -74,11 +73,6 @@ export default function App() {
             <Alerts alerts={alerts} />
           </div>
           <div className="tb-right">
-            <div className="seg" role="group" aria-label="Temperature unit">
-              {['C', 'F'].map((u) => (
-                <button key={u} className={unit === u ? 'on' : ''} onClick={() => setUnit(u)} aria-pressed={unit === u}>°{u}</button>
-              ))}
-            </div>
             <button className="icon-btn" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} aria-label="Toggle light/dark theme" title="Toggle theme">
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>

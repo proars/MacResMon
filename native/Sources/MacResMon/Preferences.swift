@@ -18,7 +18,7 @@ final class Preferences {
     var keepRunning: Bool { get { flag("keepRunning", true) } set { set(newValue, "keepRunning") } }
     /// macOS notifications for alerts (overheating, fan at maximum, memory, battery, disk).
     var notifications: Bool { get { flag("notifications", true) } set { set(newValue, "notifications") } }
-    /// 0 = Celsius, 1 = Fahrenheit, 2 = follow the system region. Used by the menu bar and notifications.
+    /// 0 = Celsius, 1 = Fahrenheit, 2 = follow the system region. Used by the window, the menu bar and notifications.
     var unitChoice: Int { get { defaults.object(forKey: "unitChoice") as? Int ?? 0 } set { set(newValue, "unitChoice") } }
 
     /// Seconds between updates (sensors, snapshot, menu bar, window). One of `refreshChoices`.

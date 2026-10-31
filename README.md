@@ -97,7 +97,7 @@ The result is `native/build/MacResMon.dmg`. It carries the same ad-hoc signature
 - **Menu bar**: click the fan icon for CPU, GPU, memory, fans, power, battery and active alerts, or to open the window or Settings.
 - **Notifications**: macOS asks for permission the first time one is needed (or when you press "Send test notification" in Settings).
 - **Launch at login**: switch it on in Settings. macOS may ask you to approve it in System Settings › General › Login Items; Settings has a button that opens it.
-- The temperature unit in Settings applies to the menu bar and notifications; the window has its own °C/°F switch.
+- The temperature unit (°C, °F or follow the system region) is set in Settings only and applies to the window, the menu bar and notifications.
 
 ## How it works
 

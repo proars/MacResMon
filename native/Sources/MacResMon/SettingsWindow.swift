@@ -26,7 +26,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
         let test = NSButton(title: "Send test notification", target: self, action: #selector(sendTest))
         let loginSettings = NSButton(title: "Open Login Items…", target: self, action: #selector(openLoginItems))
-        let unitRow = NSStackView(views: [NSTextField(labelWithString: "Temperature unit (menu bar, notifications):"), unit])
+        let unitRow = NSStackView(views: [NSTextField(labelWithString: "Temperature unit:"), unit])
         unitRow.spacing = 8
         let refreshRow = NSStackView(views: [NSTextField(labelWithString: "Update interval:"), interval])
         refreshRow.spacing = 8

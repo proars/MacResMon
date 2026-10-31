@@ -56,7 +56,8 @@ final class Monitor {
             point = p
         }
         let snap = snapshotDictionary(hw: cur.hw, sys: cur.sys, error: cur.error, sensorTs: cur.at, ts: ts,
-                                      uptime: Int(Date().timeIntervalSince(booted)), point: point, intervalMs: Int(interval * 1000))
+                                      uptime: Int(Date().timeIntervalSince(booted)), point: point, intervalMs: Int(interval * 1000),
+                                      unit: Preferences.shared.unit)
         latest = snap
         if wantsWeb() { onEvent?("snapshot", jsonString(snap)) }
         onTick?(Live(hw: cur.hw, sys: cur.sys, alerts: evaluateAlerts(hw: cur.hw, sys: cur.sys, unit: Preferences.shared.unit), error: cur.error))
