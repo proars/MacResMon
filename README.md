@@ -30,6 +30,7 @@ MacResMon monitors your Mac; it does not change fan speeds, CPU settings, or the
 - **Cooling**: a spinning rotor per fan (speed follows RPM), one filled graph with a line per fan, and a live legend with RPM and % of maximum
 - **CPU, GPU, memory**: load rings, thermometers in °C or °F, swap, 60-sample trends (one minute at the default interval), and a load column for every CPU core, grouped by Performance and Efficiency cluster
 - **Power and battery**: whole-system watts, chip (CPU + GPU + ANE + RAM), CPU and GPU power, charge level, charging state, time left and power adapter wattage
+- **Header**: a power-source badge ("AC power 80%", with charging or draining watts and time left on battery) and a **This Mac** button that opens the chip, macOS version, core counts per tier, GPU cores, and memory and disk usage. Hover the badge, the button or a core column for details
 - **Top processes**: top 5 by CPU and by memory, to answer "what is heating the Mac?"
 - **Storage and network**: free space, disk read/write speed, download and upload in MB/s and Mbps
 - **Menu bar**: a fan icon with a live readout (CPU % and temperature, `⚠︎` while an alert is active) and a menu with the details
@@ -210,6 +211,10 @@ For a shared-link preview, upload a 1280 × 640 PNG or JPG under 1 MB in **Setti
 Enable Issues for bug and model compatibility reports. Publish source with the MIT license and both README screenshots; keep generated build folders out of commits. For downloadable builds, attach the DMG to a versioned GitHub Release and document supported hardware, build provenance, and signing/notarization status. Add a README download link once the release asset is available.
 
 </details>
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=proars/MacResMon&type=Date)](https://star-history.com/#proars/MacResMon&Date)
 
 ## Credits and license
 

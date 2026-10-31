@@ -7,6 +7,7 @@ public struct SystemSample {
     public var procs: [Proc] = []
     public var battery: Battery?
     public var disk: Disk?
+    public var machine: Machine?
     public var netIn, netOut, diskRead, diskWrite: Double?
     public init() {}
 }
@@ -47,7 +48,12 @@ public func snapshotDictionary(hw: Hardware?, sys: SystemSample, error: String?,
     s["procs"] = ["cpu": topBy(sys.procs, { $0.cpu }).map(procJSON), "mem": topBy(sys.procs, { $0.rss }).map(procJSON)]
     s["battery"] = sys.battery.map { b in
         ["percent": b.percent, "onBattery": b.onBattery, "charging": b.charging, "state": b.state,
-         "remaining": b.remaining ?? null, "adapterW": b.adapterW ?? null] as [String: Any]
+         "remaining": b.remaining ?? null, "adapterW": b.adapterW ?? null, "batteryW": b.batteryW ?? null] as [String: Any]
+    } ?? null
+    s["machine"] = sys.machine.map { m in
+        ["name": m.name ?? null, "model": m.model ?? null, "chip": m.chip ?? null, "os": m.os ?? null, "memory": m.memory ?? null,
+         "gpuCores": m.gpuCores ?? null, "cores": m.tiers.isEmpty ? null : m.tiers.reduce(0) { $0 + $1.cores } as Any,
+         "tiers": m.tiers.map { ["name": $0.name, "cores": $0.cores] as [String: Any] }] as [String: Any]
     } ?? null
     s["disk"] = sys.disk.map { ["total": $0.total, "free": $0.free] as [String: Any] } ?? null
     s["net"] = ["in": orNull(sys.netIn), "out": orNull(sys.netOut)]

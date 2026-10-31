@@ -7,6 +7,8 @@ import Sparkline from './Sparkline.jsx';
 import CoolingCard from './CoolingCard.jsx';
 import MemoryCard from './Memory.jsx';
 import Alerts from './Alerts.jsx';
+import PowerBadge from './PowerBadge.jsx';
+import MachineButton from './MachineButton.jsx';
 import Processes from './Processes.jsx';
 import Battery from './Battery.jsx';
 import Storage from './Storage.jsx';
@@ -69,10 +71,12 @@ export default function App() {
         <div className="topbar-in">
           <h1>MacRes<span>Mon</span></h1>
           <div className="badges">
-            <span className={`badge status ${state[0]}`}><i /> {state[1]}</span>
+            <PowerBadge battery={snap.battery} />
             <Alerts alerts={alerts} />
           </div>
           <div className="tb-right">
+            <span className={`badge status ${state[0]}`}><i /> {state[1]}</span>
+            <MachineButton m={snap.machine} ram={{ used: snap.ramUsed, total: snap.ramTotal }} disk={snap.disk} />
             <button className="icon-btn" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} aria-label="Toggle light/dark theme" title="Toggle theme">
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>

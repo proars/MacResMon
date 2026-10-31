@@ -11,9 +11,22 @@ public struct Proc {
 public struct Battery {
     public var percent: Int, onBattery: Bool, charging: Bool
     public var state: String, remaining: String?, adapterW: Int?
-    public init(percent: Int, onBattery: Bool, charging: Bool, state: String, remaining: String?, adapterW: Int?) {
-        self.percent = percent; self.onBattery = onBattery; self.charging = charging; self.state = state; self.remaining = remaining; self.adapterW = adapterW
+    /// Watts into (+) or out of (-) the battery; nil when unknown.
+    public var batteryW: Double?
+    public init(percent: Int, onBattery: Bool, charging: Bool, state: String, remaining: String?, adapterW: Int?, batteryW: Double? = nil) {
+        self.percent = percent; self.onBattery = onBattery; self.charging = charging; self.state = state; self.remaining = remaining; self.adapterW = adapterW; self.batteryW = batteryW
     }
+}
+public struct Tier {
+    public var name: String; public var cores: Int
+    public init(name: String, cores: Int) { self.name = name; self.cores = cores }
+}
+/// Static facts about this Mac, read once.
+public struct Machine {
+    public var name: String?, model: String?, chip: String?, os: String?, memory: String?
+    public var gpuCores: Int?
+    public var tiers: [Tier] = []
+    public init() {}
 }
 public struct Disk {
     public var total: Double; public var free: Double
@@ -36,8 +49,35 @@ public func topBy(_ procs: [Proc], _ key: (Proc) -> Double, count: Int = 5) -> [
     Array(procs.sorted { key($0) > key($1) }.prefix(count))
 }
 
-/// `pmset -g batt` (+ `pmset -g ac` for adapter watts) -> battery, or nil on a Mac without one.
-public func parseBattery(_ batt: String, ac: String = "") -> Battery? {
+/// `ioreg -rn AppleSmartBattery` -> watts into (+) or out of (-) the battery (voltage x current), or nil.
+public func parseBatteryPower(_ ioreg: String) -> Double? {
+    func value(_ key: String) -> UInt64? {
+        guard let r = ioreg.range(of: "\"\(key)\" = (\\d+)", options: .regularExpression) else { return nil }
+        return UInt64(ioreg[r].filter(\.isNumber))
+    }
+    guard let a = value("Amperage"), let v = value("Voltage") else { return nil }
+    // The current is a signed 64-bit number that ioreg prints as unsigned (a discharge shows as 2^64 - mA).
+    return Double(Int64(bitPattern: a)) * Double(v) / 1e6
+}
+
+/// `system_profiler -json SPHardwareDataType SPDisplaysDataType` + macOS version + core tiers -> machine facts.
+public func parseMachine(profiler: String, os: String, tiers: [Tier]) -> Machine {
+    var m = Machine()
+    let root = (try? JSONSerialization.jsonObject(with: Data(profiler.utf8))) as? [String: Any] ?? [:]
+    let hw = (root["SPHardwareDataType"] as? [[String: Any]])?.first ?? [:]
+    let gpu = (root["SPDisplaysDataType"] as? [[String: Any]])?.first ?? [:]
+    m.name = hw["machine_name"] as? String
+    m.model = hw["machine_model"] as? String
+    m.chip = hw["chip_type"] as? String
+    m.memory = hw["physical_memory"] as? String
+    m.gpuCores = (gpu["sppci_cores"] as? String).flatMap { Int($0) }
+    m.os = os.isEmpty ? nil : os
+    m.tiers = tiers
+    return m
+}
+
+/// `pmset -g batt` (+ `pmset -g ac` for adapter watts, + `ioreg -rn AppleSmartBattery` for battery watts) -> battery, or nil on a Mac without one.
+public func parseBattery(_ batt: String, ac: String = "", power: String = "") -> Battery? {
     guard let line = batt.split(separator: "\n").first(where: { $0.contains("InternalBattery") }) else { return nil }
     var text = String(line)
     if let r = text.range(of: #"\s+present:.*$"#, options: .regularExpression) { text.removeSubrange(r) }
@@ -54,7 +94,7 @@ public func parseBattery(_ batt: String, ac: String = "") -> Battery? {
     if !onBattery, let r = ac.range(of: #"Wattage\s*=\s*(\d+)\s*W"#, options: [.regularExpression, .caseInsensitive]) {
         adapter = Int(ac[r].filter(\.isNumber))
     }
-    return Battery(percent: percent, onBattery: onBattery, charging: state == "charging", state: state, remaining: remaining, adapterW: adapter)
+    return Battery(percent: percent, onBattery: onBattery, charging: state == "charging", state: state, remaining: remaining, adapterW: adapter, batteryW: parseBatteryPower(power))
 }
 
 /// `df -k <path>` -> total and free bytes.

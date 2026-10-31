@@ -49,6 +49,14 @@ check("parseBattery on AC, not charging", ac?.percent == 80 && ac?.onBattery == 
 let dis = parseBattery("Now drawing from 'Battery Power'\n -InternalBattery-0 (id=1)\t55%; discharging; 3:41 remaining present: true")
 check("parseBattery discharging with time left", dis?.percent == 55 && dis?.onBattery == true && dis?.remaining == "3:41" && dis?.adapterW == nil, "\(String(describing: dis))")
 check("parseBattery charging; no battery -> nil", parseBattery("Now drawing from 'AC Power'\n -InternalBattery-0 (id=1)\t40%; charging; 1:10 remaining present: true")?.charging == true && parseBattery("Now drawing from 'AC Power'\n") == nil && parseBattery("") == nil)
+let chargeIO = "  | |   \"Amperage\" = 1500\n  | |   \"Voltage\" = 12900\n"
+let drainIO = "  | |   \"Amperage\" = 18446744073709550116\n  | |   \"Voltage\" = 12000\n"   // -1500 mA as ioreg prints it
+check("parseBatteryPower: charging +, discharging -, missing -> nil", abs((parseBatteryPower(chargeIO) ?? 0) - 19.35) < 0.001 && abs((parseBatteryPower(drainIO) ?? 0) + 18.0) < 0.001 && parseBatteryPower("") == nil)
+check("parseBattery carries battery watts", parseBattery("Now drawing from 'Battery Power'\n -InternalBattery-0 (id=1)\t55%; discharging; 3:41 remaining present: true", power: drainIO)?.batteryW != nil && ac?.batteryW == nil)
+let profiler = #"{"SPHardwareDataType":[{"machine_name":"MacBook Pro","machine_model":"Mac17,7","chip_type":"Apple M5 Pro","physical_memory":"64 GB"}],"SPDisplaysDataType":[{"sppci_cores":"20"}]}"#
+let mach = parseMachine(profiler: profiler, os: "26.1", tiers: [Tier(name: "Super", cores: 6), Tier(name: "Performance", cores: 12)])
+check("parseMachine reads chip, model, memory, GPU cores, tiers", mach.chip == "Apple M5 Pro" && mach.name == "MacBook Pro" && mach.model == "Mac17,7" && mach.memory == "64 GB" && mach.gpuCores == 20 && mach.os == "26.1" && mach.tiers.map(\.cores) == [6, 12])
+check("parseMachine survives garbage", parseMachine(profiler: "nope", os: "", tiers: []).chip == nil)
 
 let d = parseDisk("Filesystem 1024-blocks Used Available Capacity iused ifree %iused Mounted on\n/dev/disk3s5 1948404040 636512180 1281897480 34% 1 2 0% /System/Volumes/Data")
 check("parseDisk total and free bytes", d?.total == 1948404040 * 1024 && d?.free == 1281897480 * 1024 && parseDisk("") == nil)
@@ -57,14 +65,14 @@ check("rate gives bytes/second and rejects bad input", rate(1000, 3000, dtMs: 10
 
 // ---- snapshot ----
 var sys = SystemSample()
-sys.netIn = 1000; sys.battery = ac; sys.procs = procs
+sys.netIn = 1000; sys.battery = ac; sys.procs = procs; sys.machine = mach
 let pt = historyPoint(hw: hw, sys: sys, ts: 1)
 let snap = snapshotDictionary(hw: hw, sys: sys, error: nil, sensorTs: 5, ts: 6, uptime: 3, point: pt)
 let json = jsonString(snap)
 check("snapshot reports the refresh interval", (snap["intervalMs"] as? Int) == 1000 && (snapshotDictionary(hw: hw, sys: sys, error: nil, sensorTs: 5, ts: 6, uptime: 3, point: pt, intervalMs: 500)["intervalMs"] as? Int) == 500)
 check("snapshot carries the temperature unit", (snap["unit"] as? String) == "C" && (snapshotDictionary(hw: hw, sys: sys, error: nil, sensorTs: 5, ts: 6, uptime: 3, point: pt, unit: .fahrenheit)["unit"] as? String) == "F")
 let back = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any] ?? [:]
-check("snapshot has the keys the UI reads", ["cpu", "clusters", "fans", "procs", "battery", "disk", "net", "diskIO", "source", "sensorTs", "ts", "uptime", "intervalMs", "unit", "point"].allSatisfy { back[$0] != nil }, "\(back.keys.sorted())")
+check("snapshot has the keys the UI reads", ["cpu", "clusters", "fans", "procs", "battery", "disk", "net", "diskIO", "source", "sensorTs", "ts", "uptime", "intervalMs", "unit", "machine", "point"].allSatisfy { back[$0] != nil }, "\(back.keys.sorted())")
 check("snapshot round-trips as JSON with null for missing values", (back["disk"] is NSNull) && ((back["point"] as? [String: Any])?["diskR"] is NSNull) && ((back["net"] as? [String: Any])?["in"] as? Double) == 1000)
 let err = snapshotDictionary(hw: nil, sys: SystemSample(), error: "macmon not found", sensorTs: nil, ts: 6, uptime: 0, point: nil)
 check("without hardware the snapshot carries an error and no cpu", (err["error"] as? String) == "macmon not found" && err["cpu"] == nil)

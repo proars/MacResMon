@@ -67,6 +67,8 @@ const Power = await bundle('src/Power.jsx');
 const Alerts = await bundle('src/Alerts.jsx');
 const Processes = await bundle('src/Processes.jsx');
 const Battery = await bundle('src/Battery.jsx');
+const PowerBadge = await bundle('src/PowerBadge.jsx');
+const MachineButton = await bundle('src/MachineButton.jsx');
 const Storage = await bundle('src/Storage.jsx');
 const Network = await bundle('src/Network.jsx');
 
@@ -101,6 +103,17 @@ await check('Storage', Storage, { disk: { total: 2e12, free: 1.2e12 }, io: { rea
 await check('Storage(no data)', Storage, { disk: null, io: null, history: [] });
 await check('Network', Network, { net: { in: 2e6, out: 1e5 }, history });
 await check('Network(no data)', Network, { net: null, history: [] });
+const ac = { percent: 80, onBattery: false, charging: false, state: 'not charging', remaining: null, adapterW: 65, batteryW: 0 };
+await check('PowerBadge(AC)', PowerBadge, { battery: ac });
+await check('PowerBadge(charging)', PowerBadge, { battery: { ...ac, charging: true, batteryW: 12.3 } });
+await check('PowerBadge(adapter too weak)', PowerBadge, { battery: { ...ac, batteryW: -4.2 } });
+await check('PowerBadge(on battery)', PowerBadge, { battery: { ...ac, onBattery: true, adapterW: null, batteryW: -12.3, remaining: '3:41', percent: 15 } });
+await check('PowerBadge(none)', PowerBadge, { battery: null }, true);
+const machine = { name: 'MacBook Pro', model: 'Mac17,7', chip: 'Apple M5 Pro', os: '26.1', memory: '64 GB', cores: 18, gpuCores: 20, tiers: [{ name: 'Super', cores: 6 }, { name: 'Performance', cores: 12 }] };
+await check('MachineButton', MachineButton, { m: machine, ram: { used: 41e9, total: 64e9 }, disk: { total: 2e12, free: 1.2e12 } });
+await check('MachineButton(open)', MachineButton, { m: machine, ram: { used: 41e9, total: 64e9 }, disk: { total: 2e12, free: 1.2e12 }, initialOpen: true });
+await check('MachineButton(open, no ram or disk)', MachineButton, { m: { ...machine, tiers: undefined }, ram: { used: undefined, total: undefined }, disk: null, initialOpen: true });
+await check('MachineButton(unknown)', MachineButton, { m: null }, true);
 await check('Thermometer(F)', Thermometer, { value: 63, unit: 'F' });
 
 console.log(failures === 0 ? '\nALL RENDER CHECKS PASSED' : `\n${failures} FAILURES`);

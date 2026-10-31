@@ -30,6 +30,7 @@ final class Sampler {
     private var stopped = false
     private var restartingMacmon = false
     private var _interval = 1.0
+    private var tierNames = ["Performance", "Efficiency"]
 
     /// Seconds between readings. Changing it restarts macmon with the new frame interval.
     var interval: Double {
@@ -43,7 +44,24 @@ final class Sampler {
         }
     }
 
+    /// Core tiers from sysctl, top tier first: Apple renamed them on M5 (Super / Performance), macmon still says P / E.
+    private func readTiers() -> [Tier] {
+        (0..<2).compactMap { i in
+            let name = run("/usr/sbin/sysctl", ["-n", "hw.perflevel\(i).name"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let cores = Int(run("/usr/sbin/sysctl", ["-n", "hw.perflevel\(i).physicalcpu"]).trimmingCharacters(in: .whitespacesAndNewlines))
+            return name.isEmpty || cores == nil ? nil : Tier(name: name, cores: cores!)
+        }
+    }
+
     func start() {
+        let tiers = readTiers()
+        if !tiers.isEmpty { tierNames = tiers.map(\.name) }
+        Thread.detachNewThread { [self] in   // system_profiler is slow (about a second): read the machine facts once, off the main path
+            let profiler = run("/usr/sbin/system_profiler", ["-json", "SPHardwareDataType", "SPDisplaysDataType"], timeout: 20)
+            let os = run("/usr/bin/sw_vers", ["-productVersion"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let m = parseMachine(profiler: profiler, os: os, tiers: tiers)
+            lock.lock(); system.machine = m; lock.unlock()
+        }
         DispatchQueue.global(qos: .utility).async { [self] in startMacmon() }
         Thread.detachNewThread { [self] in systemLoop() }
     }
@@ -93,7 +111,7 @@ final class Sampler {
                 buffer = rest
                 for o in objects {
                     guard let obj = try? JSONSerialization.jsonObject(with: Data(o.utf8)) as? [String: Any] else { continue }
-                    let hw = parseHardware(obj, tierNames: ["Performance", "Efficiency"])
+                    let hw = parseHardware(obj, tierNames: tierNames)
                     lock.lock(); hardware = hw; hardwareAt = nowMs(); macmonError = nil; lock.unlock()
                 }
             }
@@ -132,7 +150,8 @@ final class Sampler {
                 lastProcs = t
             }
             if t - lastBattery >= 10000 {  // battery: every 10 s
-                let b = parseBattery(run("/usr/bin/pmset", ["-g", "batt"]), ac: run("/usr/bin/pmset", ["-g", "ac"]))
+                let b = parseBattery(run("/usr/bin/pmset", ["-g", "batt"]), ac: run("/usr/bin/pmset", ["-g", "ac"]),
+                                     power: run("/usr/sbin/ioreg", ["-rn", "AppleSmartBattery"]))
                 lock.lock(); system.battery = b; lock.unlock()
                 lastBattery = t
             }
