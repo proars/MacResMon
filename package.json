@@ -1,0 +1,52 @@
+{
+  "name": "macresmon",
+  "version": "0.1.0",
+  "description": "Native macOS app for Apple Silicon Macs: CPU, GPU, memory, fan speed, temperature, power, battery, disk, network and top processes, with a menu-bar readout and overheating alerts",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "keywords": [
+    "macos",
+    "apple-silicon",
+    "m1",
+    "m2",
+    "m3",
+    "m4",
+    "macresmon",
+    "menu-bar",
+    "swift",
+    "macmon",
+    "cpu",
+    "gpu",
+    "fan-speed",
+    "temperature",
+    "power",
+    "battery"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "test": "node --test src/format.test.js src/alerts.test.js",
+    "native:build": "native/build.sh",
+    "native:check": "cd native && swift run CoreChecks",
+    "native:dev": "cd native && swift run MacResMon",
+    "native:icon": "native/Tools/make-icon.sh"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.25.12",
+    "vite": "^6.0.0"
+  }
+}

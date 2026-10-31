@@ -1,0 +1,28 @@
+# dependencies and build output
+node_modules/
+dist/
+native/.build/
+native/build/
+*.dmg
+
+# editor and OS files
+.DS_Store
+.vscode/
+.idea/
+
+# local agent instructions
+AGENTS.md
+
+# secrets and signing material
+.env
+.env.*
+*.p12
+*.pem
+*.key
+*.mobileprovision
+
+# logs and temp files
+*.log
+npm-debug.log*
+*.tmp
+.swiftpm/
