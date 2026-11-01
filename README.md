@@ -38,10 +38,17 @@ MacResMon monitors your Mac; it does not change fan speeds, CPU settings, or the
 
 1. Download **[MacResMon.dmg](https://github.com/proars/MacResMon/releases/latest/download/MacResMon.dmg)** from the [latest release](https://github.com/proars/MacResMon/releases/latest). It needs an Apple Silicon Mac with macOS 13 or later.
 2. Open the disk image and drag **MacResMon** onto the **Applications** shortcut.
-3. Open MacResMon from Applications (or Launchpad). The first time, macOS may say it cannot verify the app, because it is signed ad hoc and not notarized by Apple. Open **System Settings → Privacy & Security**, scroll to the message about MacResMon and click **Open Anyway**, then confirm. This is needed only once.
+3. Open MacResMon from Applications (or Launchpad). The first time, macOS may say it cannot verify the app, because it is signed ad hoc and not notarized by Apple. To allow it:
+   1. In the warning, click **Done** (not *Move to Trash*).
+   2. Open **System Settings → Privacy & Security** and scroll down to the message "MacResMon was blocked to protect your Mac".
+   3. Click **Open Anyway**, then confirm with your password or Touch ID and click **Open**.
+
+   The button appears only after a fresh attempt to open the app, and this is needed only once.
 4. Optional: open **Settings** (⌘, or the gear button) and switch on **Launch at login**; choose what the menu-bar readout shows.
 
 If macOS still refuses to open the app, remove the download quarantine flag in Terminal and open it again: `xattr -dr com.apple.quarantine /Applications/MacResMon.app`.
+
+The app is not notarized. If the icon keeps bouncing in the Dock and the app never starts (the system log shows `AppleSystemPolicy ... would not allow process`), the system's security check is stuck: quit the stuck process (`pgrep -x MacResMon`, then `kill -9 <pid>`), restart the Mac and open the app again. If it still does not start, [build it from source](#build-and-run) on your Mac.
 
 To check the download, compare `shasum -a 256 MacResMon.dmg` with the SHA-256 in the release notes. To remove the app, quit it and delete it from Applications; its data is the report log in `~/Library/Application Support/MacResMon/` and its settings (`defaults delete com.macresmon.app`).
 
