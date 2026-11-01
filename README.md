@@ -99,7 +99,13 @@ hdiutil create -volname "MacResMon" -srcfolder native/build/dmg \
 rm -rf native/build/dmg
 ```
 
-The result is `native/build/MacResMon.dmg`. It carries the same ad-hoc signature as the app, so the first-launch warning described above applies on other Macs.
+The result is `native/build/MacResMon.dmg`. Newer macOS versions print a warning that `hdiutil create` is deprecated; it still works. Apple's replacement, `diskutil image`, may not exist on older macOS versions, so the steps above use `hdiutil`. Where `diskutil image` is available you can use it instead of the `hdiutil create` line (same folder; delete an old `MacResMon.dmg` first, it does not overwrite):
+
+```bash
+diskutil image create from --format UDZO --volumeName MacResMon native/build/dmg native/build/MacResMon.dmg
+```
+
+The image carries the same ad-hoc signature as the app, so the first-launch warning described above applies on other Macs.
 
 ## Using the app
 
