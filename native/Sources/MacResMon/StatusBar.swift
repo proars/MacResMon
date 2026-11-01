@@ -24,14 +24,15 @@ final class StatusBar: NSObject {
 
     override init() {
         super.init()
+        // The actions come first (Open is the first thing a click on the menu-bar item is for), then the live rows.
+        let open = NSMenuItem(title: "Open MacResMon", action: #selector(showWindow), keyEquivalent: "o"); open.target = self
+        let prefs = NSMenuItem(title: "Settings…", action: #selector(settings), keyEquivalent: ","); prefs.target = self
+        menu.addItem(open); menu.addItem(prefs)
+        menu.addItem(.separator())
         for _ in 0..<6 { let m = NSMenuItem(); m.isEnabled = false; lines.append(m); menu.addItem(m) }
         alertItem.isEnabled = false
         menu.addItem(.separator())
         menu.addItem(alertItem)
-        menu.addItem(.separator())
-        let open = NSMenuItem(title: "Open MacResMon", action: #selector(showWindow), keyEquivalent: "o"); open.target = self
-        let prefs = NSMenuItem(title: "Settings…", action: #selector(settings), keyEquivalent: ","); prefs.target = self
-        menu.addItem(open); menu.addItem(prefs)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit MacResMon", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         applyVisibility()
