@@ -120,6 +120,11 @@ check("a tick without power adds no energy", near(log.days["2026-01-01"]?.second
 log.record(sample(60, 50, 10), at: t0 + 86_400_000, dt: 1, calendar: utc)
 check("days are split at local midnight", log.days.count == 2 && log.sortedDays.map(\.day) == ["2026-01-01", "2026-01-02"])
 
+var laptop = ReportLog()
+laptop.record(sample(60, 50, 284.5), at: t0, dt: 1, calendar: utc, maxW: ReportLog.maxPlausibleLaptopW)
+laptop.record(sample(60, 50, 45), at: t0 + 1000, dt: 1, calendar: utc, maxW: ReportLog.maxPlausibleLaptopW)
+check("a laptop reading above the laptop limit is ignored", near(laptop.days["2026-01-01"]?.peakW, 45), "\(String(describing: laptop.days))")
+
 var glitch = ReportLog()
 glitch.record(sample(60, 50, 5724.6), at: t0, dt: 1, calendar: utc)
 glitch.record(sample(60, 50, 12), at: t0 + 1000, dt: 0, calendar: utc)

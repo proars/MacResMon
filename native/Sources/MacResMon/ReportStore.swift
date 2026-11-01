@@ -24,12 +24,13 @@ final class ReportStore {
         }
     }
 
-    func record(_ hw: Hardware?, now: Date = Date()) {
+    func record(_ hw: Hardware?, laptop: Bool = false, now: Date = Date()) {
         let dt = lastTick.map { now.timeIntervalSince($0) } ?? 0
         lastTick = now
         guard hw != nil else { return }
         dirty = true
-        let edge = log.record(hw, at: now.timeIntervalSince1970 * 1000, dt: dt)
+        let edge = log.record(hw, at: now.timeIntervalSince1970 * 1000, dt: dt,
+                            maxW: laptop ? ReportLog.maxPlausibleLaptopW : ReportLog.maxPlausibleW)
         if edge || now.timeIntervalSince(lastSave) >= 30 { save() }
     }
 

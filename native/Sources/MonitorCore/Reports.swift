@@ -41,6 +41,8 @@ public struct ReportLog: Codable, Equatable {
     public static let maxGap = 10.0
     /// Whole-Mac power above this is a sensor glitch, not a reading (no Apple Silicon Mac draws that much): ignored.
     public static let maxPlausibleW = 600.0
+    /// A laptop (it has a battery) cannot draw more than its charger plus the battery: above this is a glitch too.
+    public static let maxPlausibleLaptopW = 200.0
     /// Oldest spikes are dropped beyond this many, so the file stays small.
     public static let maxSpikes = 5000
 
@@ -56,14 +58,14 @@ public struct ReportLog: Codable, Equatable {
     /// Folds one tick in. `dt` is the seconds since the previous tick. Returns true when a spike started or ended
     /// (worth saving at once).
     @discardableResult
-    public mutating func record(_ hw: Hardware?, at ms: Double, dt: Double, calendar: Calendar = .current) -> Bool {
+    public mutating func record(_ hw: Hardware?, at ms: Double, dt: Double, calendar: Calendar = .current, maxW: Double = ReportLog.maxPlausibleW) -> Bool {
         guard let hw = hw else { return false }
         let key = dayKey(ms, calendar: calendar)
         var day = days[key] ?? DayStats(day: key)
         var changed = false
 
         // Only ticks that cover time count (the first one has no dt), and only believable readings.
-        if let w = hw.sysPower, w >= 0, w <= Self.maxPlausibleW, dt > 0 {
+        if let w = hw.sysPower, w >= 0, w <= maxW, dt > 0 {
             let t = min(dt, Self.maxGap)
             day.energyJ += w * t
             day.seconds += t

@@ -61,7 +61,7 @@ final class Monitor {
         latest = snap
         // Keeps logging while the window is hidden, but only from fresh frames: a stalled macmon must not count as readings.
         let fresh = cur.at.map { ts - $0 < Int64(max(5000, interval * 3000)) } ?? false
-        ReportStore.shared.record(fresh ? cur.hw : nil)
+        ReportStore.shared.record(fresh ? cur.hw : nil, laptop: cur.sys.battery != nil)
         if wantsWeb() { onEvent?("snapshot", jsonString(snap)) }
         onTick?(Live(hw: cur.hw, sys: cur.sys, alerts: evaluateAlerts(hw: cur.hw, sys: cur.sys, unit: Preferences.shared.unit), error: cur.error))
     }
