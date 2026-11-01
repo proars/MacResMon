@@ -55,8 +55,9 @@ public func parseHardware(_ frame: [String: Any], tierNames: [String] = []) -> H
     hw.chipPower = number(frame["all_power"])
     hw.sysPower = number(frame["sys_power"])
     let temp = frame["temp"] as? [String: Any]
-    hw.cpuTemp = number(temp?["cpu_temp_avg"])
-    hw.gpuTemp = number(temp?["gpu_temp_avg"])
+    // macmon before 0.9 reports 0.0 for a sensor group it cannot read (the M1 has no GPU temperature): that is "no data".
+    hw.cpuTemp = number(temp?["cpu_temp_avg"]).flatMap { $0 > 0 ? $0 : nil }
+    hw.gpuTemp = number(temp?["gpu_temp_avg"]).flatMap { $0 > 0 ? $0 : nil }
     if let m = frame["memory"] as? [String: Any] {
         hw.ramTotal = number(m["ram_total"]); hw.ramUsed = number(m["ram_usage"])
         hw.swapTotal = number(m["swap_total"]); hw.swapUsed = number(m["swap_usage"])

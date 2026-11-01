@@ -24,6 +24,9 @@ let frame: [String: Any] = [
 ]
 let hw = parseHardware(frame, tierNames: ["Performance", "Efficiency"])
 check("maps utilization, power and temperatures", near(hw.cpu, 0.1) && near(hw.gpuFreq, 651) && near(hw.sysPower, 5.2) && near(hw.cpuPower, 1.4) && near(hw.chipPower, 2.1) && near(hw.cpuTemp, 41.5))
+var m1 = frame; m1["temp"] = ["cpu_temp_avg": 49.9, "gpu_temp_avg": 0.0]
+let hwM1 = parseHardware(m1, tierNames: ["Performance", "Efficiency"])
+check("a 0.0 temperature from macmon means no data (M1 has no GPU sensor)", near(hwM1.cpuTemp, 49.9) && hwM1.gpuTemp == nil)
 check("maps memory and swap bytes", near(hw.ramTotal, 68719476736) && near(hw.swapUsed, 100))
 check("builds clusters with mean load and names", hw.clusters.count == 2 && hw.clusters[0].name == "Performance" && near(hw.clusters[0].load, 0.15) && near(hw.clusters[1].load, 0.15) && hw.clusters[1].cores[1].id == 10)
 check("reshapes fans to name/rpm/max", hw.fans.count == 1 && hw.fans[0].rpm == 1800 && hw.fans[0].max == 7826)
