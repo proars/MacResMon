@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import MonitorCore
 
 /// Serves the bundled web UI (`dist/`) to the web view through an `app://` scheme.
 /// A custom scheme (instead of file://) lets the ES-module bundle load with absolute /assets paths.
@@ -48,24 +49,38 @@ window.__nativeHub = (() => {
   const subs = new Set(); let history = null, snapshot = null;
   return {
     subscribe(fn) { subs.add(fn); if (history) fn('history', history); if (snapshot) fn('snapshot', snapshot); return () => subs.delete(fn); },
-    emit(type, data) { if (type === 'history') history = data; else snapshot = data; subs.forEach((f) => f(type, data)); },
+    emit(type, data) { if (type === 'history') history = data; else if (type === 'snapshot') snapshot = data; subs.forEach((f) => f(type, data)); },
   };
 })();
+// Page -> app: answers come back as a Promise of text (see ReportActions.handle).
+window.__native = { request: (type, data) => window.webkit.messageHandlers.native.postMessage({ type, data: data || {} }) };
 """
 
-final class WebHost: NSObject, WKNavigationDelegate {
+final class WebHost: NSObject, WKNavigationDelegate, WKScriptMessageHandlerWithReply {
     let webView: WKWebView
     var onLoaded: (() -> Void)?
+    /// A request from the page: (type, data, reply). Called on the main thread.
+    var onRequest: ((String, [String: Any], @escaping (String) -> Void) -> Void)?
 
     override init() {
         let config = WKWebViewConfiguration()
         if let dist = distURL() { config.setURLSchemeHandler(DistSchemeHandler(root: dist), forURLScheme: "app") }
-        config.userContentController.addUserScript(WKUserScript(source: hubScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
+        installHub()
+        config.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "native")
         webView.navigationDelegate = self
         if #available(macOS 13.3, *) { webView.isInspectable = true }
         webView.setValue(false, forKey: "drawsBackground") // no white flash before the page paints
+    }
+
+    /// UI choices the page remembers (theme, tab, report period): kept in UserDefaults and handed to the page before
+    /// its scripts run as `window.__webState`, because WebKit's localStorage is not reliably kept for the app:// scheme.
+    func installHub() {
+        let state = jsonString(Preferences.shared.webState)
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        controller.addUserScript(WKUserScript(source: hubScript + "\nwindow.__webState = \(state);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
 
     func load() {
@@ -84,6 +99,11 @@ final class WebHost: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { onLoaded?() }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
+        guard let body = message.body as? [String: Any], let type = body["type"] as? String, let onRequest = onRequest else { replyHandler(nil, "bad request"); return }
+        onRequest(type, body["data"] as? [String: Any] ?? [:]) { replyHandler($0, nil) }
+    }
 
     /// Writes a PNG of the web view (used by `--screenshot <file>` for docs and checks).
     func snapshot(to path: String, done: @escaping () -> Void) {

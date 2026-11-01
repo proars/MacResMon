@@ -103,5 +103,83 @@ let a1 = Alert(id: "mem", level: .warning, text: "m"), a2 = Alert(id: "disk", le
 let n1 = tracker.update([a1]), n2 = tracker.update([a1]), n3 = tracker.update([a1, a2]), n4 = tracker.update([]), n5 = tracker.update([a1])
 check("AlertTracker reports an alert once, again after it clears", n1 == [a1] && n2.isEmpty && n3 == [a2] && n4.isEmpty && n5 == [a1])
 
+// ---- reports ----
+var utc = Calendar(identifier: .gregorian); utc.timeZone = TimeZone(identifier: "UTC")!
+let t0 = 1_767_225_600_000.0   // 2026-01-01 00:00:00 UTC
+func sample(_ cpu: Double?, _ gpu: Double?, _ w: Double?) -> Hardware { var h = Hardware(); h.cpuTemp = cpu; h.gpuTemp = gpu; h.sysPower = w; return h }
+var log = ReportLog()
+log.record(sample(60, 50, 20), at: t0, dt: 0, calendar: utc)
+log.record(sample(61, 50, 30), at: t0 + 1000, dt: 1, calendar: utc)
+log.record(sample(62, 50, 10), at: t0 + 2000, dt: 1, calendar: utc)
+let d1 = log.days["2026-01-01"]
+check("report day sums power x time, peak and max temperature", near(d1?.energyJ, 40) && near(d1?.seconds, 2) && near(d1?.peakW, 30) && near(d1?.maxTempC, 62), "\(String(describing: d1))")
+log.record(sample(60, 50, 10), at: t0 + 3000, dt: 3600, calendar: utc)
+check("a long gap (sleep) counts at most maxGap seconds", near(log.days["2026-01-01"]?.seconds, 2 + ReportLog.maxGap))
+log.record(sample(60, 50, nil), at: t0 + 4000, dt: 1, calendar: utc)
+check("a tick without power adds no energy", near(log.days["2026-01-01"]?.seconds, 2 + ReportLog.maxGap))
+log.record(sample(60, 50, 10), at: t0 + 86_400_000, dt: 1, calendar: utc)
+check("days are split at local midnight", log.days.count == 2 && log.sortedDays.map(\.day) == ["2026-01-01", "2026-01-02"])
+
+var glitch = ReportLog()
+glitch.record(sample(60, 50, 5724.6), at: t0, dt: 1, calendar: utc)
+glitch.record(sample(60, 50, 12), at: t0 + 1000, dt: 0, calendar: utc)
+glitch.record(sample(60, 50, 20), at: t0 + 2000, dt: 1, calendar: utc)
+check("implausible power and ticks without time are ignored for energy and peak", near(glitch.days["2026-01-01"]?.peakW, 20) && near(glitch.days["2026-01-01"]?.energyJ, 20) && near(glitch.days["2026-01-01"]?.seconds, 1), "\(String(describing: glitch.days["2026-01-01"]))")
+
+var sp = ReportLog()
+check("spike opens at the alert threshold (not below)", !sp.record(sample(Limits.temp - 0.1, 50, 5), at: t0, dt: 1, calendar: utc) && sp.allSpikes.isEmpty)
+check("spike start is reported", sp.record(sample(Limits.temp, 50, 5), at: t0 + 1000, dt: 1, calendar: utc) && sp.allSpikes.count == 1 && sp.allSpikes[0].ongoing && sp.spikes.isEmpty)
+sp.record(sample(97, 91, 5), at: t0 + 2000, dt: 1, calendar: utc)
+sp.record(sample(93, 91, 5), at: t0 + 3000, dt: 1, calendar: utc)
+check("one episode per sensor tracks its peak", sp.allSpikes.count == 2 && sp.allSpikes.first { $0.sensor == "CPU" }?.peakC == 97 && sp.days["2026-01-01"]?.spikes == 2)
+check("spike end is reported and the event is stored", sp.record(sample(80, 91, 5), at: t0 + 4000, dt: 1, calendar: utc) && sp.spikes.count == 1
+      && sp.spikes[0].sensor == "CPU" && near(sp.spikes[0].start, t0 + 1000) && near(sp.spikes[0].end, t0 + 3000) && !sp.spikes[0].ongoing)
+sp.finish()
+check("finish closes episodes still open", sp.spikes.count == 2 && sp.allSpikes.allSatisfy { !$0.ongoing })
+sp.record(sample(95, nil, 5), at: t0 + 5000, dt: 1, calendar: utc)
+check("a new episode after a finished one counts again", sp.days["2026-01-01"]?.spikes == 3)
+let reloaded = try? JSONDecoder().decode(ReportLog.self, from: JSONEncoder().encode(sp))
+check("the log survives a JSON round trip (open episodes are not saved)", reloaded?.days == sp.days && reloaded?.spikes == sp.spikes && reloaded?.allSpikes.count == 2)
+var pk = ReportLog()
+for (i, t) in [91.0, 95, 95.4, 94.8, 93, 95.2, 80].enumerated() { pk.record(sample(t, nil, 5), at: t0 + Double(i) * 1000, dt: 1, calendar: utc) }
+check("spike keeps when the peak was reached and how long it stayed within 1 °C of it", pk.spikes.count == 1 && near(pk.spikes[0].peakC, 95.4) && near(pk.spikes[0].peakAt, t0 + 2000) && near(pk.spikes[0].peakSecs, 4), "\(pk.spikes)")
+let oldSpike = try? JSONDecoder().decode(SpikeEvent.self, from: Data(#"{"start":1,"end":2,"sensor":"CPU","peakC":91,"ongoing":false}"#.utf8))
+check("spikes saved before peak times existed still load (readers fall back to the start)", oldSpike != nil && oldSpike?.peakAt == nil && oldSpike?.peakSecs == nil && spikesCSV([oldSpike!], unit: .celsius, calendar: utc).contains(",1970-01-01 00:00:00,0,"))
+var climb = ReportLog()
+var climbTemps = Array(repeating: 94.0, count: 10) + [94.9, 95.8, 50]
+for (i, t) in climbTemps.enumerated() { climb.record(sample(t, nil, 5), at: t0 + Double(i) * 1000, dt: 1, calendar: utc) }
+check("a slow climb does not count the time spent far below the final peak", climb.spikes.count == 1 && near(climb.spikes[0].peakC, 95.8) && near(climb.spikes[0].peakSecs, 2), "\(climb.spikes)")
+var many = ReportLog()
+for i in 0..<(ReportLog.maxSpikes + 5) {
+    many.record(sample(95, nil, 5), at: t0 + Double(i) * 2000, dt: 1, calendar: utc)
+    many.record(sample(50, nil, 5), at: t0 + Double(i) * 2000 + 1000, dt: 1, calendar: utc)
+}
+check("only the newest maxSpikes are kept", many.spikes.count == ReportLog.maxSpikes && near(many.spikes[0].start, t0 + 5 * 2000))
+check("range filter keeps days and spikes from the given day", reportRange(sp, from: "2026-01-02", calendar: utc).days.isEmpty && reportRange(sp, from: "2026-01-02", calendar: utc).spikes.isEmpty
+      && reportRange(sp, from: nil, calendar: utc).days.count == 1 && reportRange(sp, from: "2026-01-01", calendar: utc).spikes.count == 3)
+check("energy cost: 1 kWh at 0.25 = 0.25", near(energyCost(3.6e6, price: 0.25), 0.25))
+let dc = daysCSV(log.sortedDays, price: 0.2).split(separator: "\n").map(String.init)
+check("days CSV has a header and one row per day", dc.count == 3 && dc[0].hasPrefix("date,energy_Wh,avg_W") && dc[1].hasPrefix("2026-01-01,"), "\(dc)")
+let sc = spikesCSV(sp.allSpikes, unit: .fahrenheit, calendar: utc).split(separator: "\n").map(String.init)
+check("spikes CSV converts to the unit and formats times", sc.count == 4 && sc[0] == "start,end,sensor,peak_F,peak_at,seconds_near_peak,duration_s,ongoing" && sc[1].hasPrefix("2026-01-01 00:00:01,2026-01-01 00:00:03,CPU,206.6,2026-01-01 00:00:02,1,2,no"), "\(sc)")
+check("CSV fields with commas, quotes or newlines are quoted", csvField("a,b") == "\"a,b\"" && csvField("say \"hi\"") == "\"say \"\"hi\"\"\"" && csvField("x\ny") == "\"x\ny\"" && csvField("plain") == "plain")
+let rd = reportDictionary(log, price: 0.2, currency: "$", unit: .celsius)
+let rdBack = (try? JSONSerialization.jsonObject(with: Data(jsonString(rd).utf8))) as? [String: Any]
+check("report payload has price, unit, days and spikes", rdBack?["unit"] as? String == "C" && rdBack?["price"] as? Double == 0.2 && (rdBack?["days"] as? [Any])?.count == 2 && (rdBack?["spikes"] as? [Any])?.isEmpty == true)
+
+// ---- menu-bar title ----
+var mb = Hardware(); mb.cpu = 0.12; mb.cpuTemp = 54.4; mb.gpu = 0.39; mb.gpuTemp = 53; mb.ramUsed = 46; mb.ramTotal = 100; mb.sysPower = 15.2
+mb.fans = [Fan(name: nil, rpm: 2319, max: 7000), Fan(name: nil, rpm: 2503.4, max: 7000)]
+let mbBat = Battery(percent: 80, onBattery: false, charging: false, state: "not charging", remaining: nil, adapterW: 65)
+func mbTitle(_ items: Set<MenuBarItem>, hw: Hardware? = mb, unit: TempUnit = .celsius, alerting: Bool = false, error: String? = nil) -> String {
+    menuBarTitle(hw: hw, battery: mbBat, items: items, unit: unit, alerting: alerting, error: error)
+}
+check("default menu-bar title is CPU load and temperature (as before)", MenuBarItem.defaults == [.cpuLoad, .cpuTemp] && mbTitle(MenuBarItem.defaults) == " 12%  54°", mbTitle(MenuBarItem.defaults))
+check("every item formats its value", mbTitle([.gpuLoad]) == " GPU 39%" && mbTitle([.gpuTemp]) == " GPU 53°" && mbTitle([.memory]) == " RAM 46%" && mbTitle([.fan]) == " 2503 rpm" && mbTitle([.power]) == " 15 W" && mbTitle([.battery]) == " Bat 80%")
+check("parts come in a fixed order whatever the selection", mbTitle(Set(MenuBarItem.allCases)) == " 12%  54°  GPU 39%  GPU 53°  RAM 46%  2503 rpm  15 W  Bat 80%", mbTitle(Set(MenuBarItem.allCases)))
+check("menu-bar temperature follows the unit", mbTitle([.cpuTemp], unit: .fahrenheit) == " 130°")
+check("alert prefix, empty selection and missing data", mbTitle([.cpuLoad], alerting: true) == " ⚠︎ 12%" && mbTitle([]) == " " && mbTitle([.cpuLoad], hw: nil) == "" && mbTitle([.cpuLoad], hw: nil, error: "x") == " –" && mbTitle([.fan], hw: Hardware()) == " " && mbTitle([.battery], hw: Hardware()) == " Bat 80%")
+check("stored item names map back, unknown names are ignored", MenuBarItem.set(from: ["cpuLoad", "fan", "nope"]) == [.cpuLoad, .fan] && MenuBarItem.set(from: []).isEmpty)
+
 print(failures == 0 ? "\nALL CHECKS PASSED" : "\n\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

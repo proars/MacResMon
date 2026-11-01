@@ -71,6 +71,8 @@ const PowerBadge = await bundle('src/PowerBadge.jsx');
 const MachineButton = await bundle('src/MachineButton.jsx');
 const Storage = await bundle('src/Storage.jsx');
 const Network = await bundle('src/Network.jsx');
+const Reports = await bundle('src/Reports.jsx');
+const SettingsButton = await bundle('src/SettingsButton.jsx');
 
 console.log('--- App (connecting, default state) ---');
 await check('App', App, {});
@@ -115,6 +117,18 @@ await check('MachineButton(open)', MachineButton, { m: machine, ram: { used: 41e
 await check('MachineButton(open, no ram or disk)', MachineButton, { m: { ...machine, tiers: undefined }, ram: { used: undefined, total: undefined }, disk: null, initialOpen: true });
 await check('MachineButton(unknown)', MachineButton, { m: null }, true);
 await check('Thermometer(F)', Thermometer, { value: 63, unit: 'F' });
+
+const day = (d, over = {}) => ({ day: d, energyJ: 5.4e5, seconds: 3600, peakW: 38, spikes: 0, maxTempC: 71, ...over });
+const reportData = {
+  price: 0.17, currency: '$', unit: 'C',
+  days: [day('2026-01-01', { spikes: 1, maxTempC: 94 }), day(new Date().toISOString().slice(0, 10)), day('2026-01-03', { maxTempC: null, seconds: 0, energyJ: 0 })],
+  spikes: [{ start: Date.now() - 6e4, end: Date.now(), sensor: 'CPU', peakC: 94.2, ongoing: true, peakAt: Date.now() - 3e4, peakSecs: 20 }, { start: Date.now() - 9e6, end: Date.now() - 8.9e6, sensor: 'GPU', peakC: 91, ongoing: false }],
+};
+await check('SettingsButton', SettingsButton, {});
+await check('Reports', Reports, { initial: reportData });
+await check('Reports(F)', Reports, { initial: { ...reportData, unit: 'F' } });
+await check('Reports(empty log)', Reports, { initial: { ...reportData, days: [], spikes: [] } });
+await check('Reports(loading)', Reports, {});
 
 console.log(failures === 0 ? '\nALL RENDER CHECKS PASSED' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

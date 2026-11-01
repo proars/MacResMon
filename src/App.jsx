@@ -13,6 +13,9 @@ import Processes from './Processes.jsx';
 import Battery from './Battery.jsx';
 import Storage from './Storage.jsx';
 import Network from './Network.jsx';
+import Reports from './Reports.jsx';
+import SettingsButton from './SettingsButton.jsx';
+import { getState, setState } from './webState.js';
 import PowerCard from './Power.jsx';
 import { Card, Stat, heat } from './ui.jsx';
 import { pct, num, ghz, uptime } from './format.js';
@@ -52,8 +55,12 @@ export default function App() {
   const [theme, setTheme] = useState(() => (typeof document !== 'undefined' && document.documentElement.dataset.theme) || 'light');
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    try { localStorage.setItem('theme', theme); } catch { /* storage blocked */ }
+    setState('theme', theme);
   }, [theme]);
+
+  // Dashboard / Reports switch, remembered between launches.
+  const [view, setView] = useState(() => (getState('view') === 'reports' ? 'reports' : 'monitor'));
+  const pickView = (v) => { setView(v); setState('view', v); };
 
   // The app keeps pushing snapshots (this render runs with each one) even when macmon stalls, so the age of
   // the last sensor frame (sensorTs) tells whether the readings are still fresh.
@@ -70,6 +77,10 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-in">
           <h1>MacRes<span>Mon</span></h1>
+          <nav className="tabs" aria-label="View">
+            <button className={`tab${view === 'monitor' ? ' on' : ''}`} aria-pressed={view === 'monitor'} onClick={() => pickView('monitor')}>Dashboard</button>
+            <button className={`tab${view === 'reports' ? ' on' : ''}`} aria-pressed={view === 'reports'} onClick={() => pickView('reports')}>Reports</button>
+          </nav>
           <div className="badges">
             <PowerBadge battery={snap.battery} />
             <Alerts alerts={alerts} />
@@ -77,6 +88,7 @@ export default function App() {
           <div className="tb-right">
             <span className={`badge status ${state[0]}`}><i /> {state[1]}</span>
             <MachineButton m={snap.machine} ram={{ used: snap.ramUsed, total: snap.ramTotal }} disk={snap.disk} />
+            <SettingsButton />
             <button className="icon-btn" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} aria-label="Toggle light/dark theme" title="Toggle theme">
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
@@ -85,7 +97,7 @@ export default function App() {
       </header>
 
       <main>
-        <div className="grid">
+        {view === 'reports' ? <Reports /> : <div className="grid">
           {waiting ? (
             <Card title="Hardware" wide><p className="muted">{snap.error || 'Waiting for sensor data…'}</p></Card>
           ) : (
@@ -123,7 +135,7 @@ export default function App() {
               <Processes procs={snap.procs} />
             </>
           )}
-        </div>
+        </div>}
       </main>
     </div>
   );

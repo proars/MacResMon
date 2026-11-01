@@ -28,6 +28,30 @@ final class Preferences {
         set { set(newValue, "refreshInterval") }
     }
 
+    /// Small UI choices of the web page (theme, view, period), see WebHost.installHub.
+    var webState: [String: String] {
+        get { defaults.dictionary(forKey: "webState") as? [String: String] ?? [:] }
+        set { defaults.set(newValue, forKey: "webState") }
+    }
+
+    /// What the menu-bar item shows (see MenuBarItem). Stored as a list of names; the default is the old look, CPU load and temperature.
+    var menuBarItems: Set<MenuBarItem> {
+        get {
+            guard let raw = defaults.array(forKey: "menuBarItems") as? [String] else { return MenuBarItem.defaults }
+            return MenuBarItem.set(from: raw)
+        }
+        set { set(MenuBarItem.allCases.filter(newValue.contains).map(\.rawValue), "menuBarItems") }
+    }
+
+    /// Price of one kWh, for the cost column of the Reports page. Never negative.
+    static let defaultPrice = 0.17
+    var electricityPrice: Double {
+        get { let v = defaults.object(forKey: "electricityPrice") as? Double ?? Self.defaultPrice; return v.isFinite && v >= 0 ? v : Self.defaultPrice }
+        set { if newValue.isFinite && newValue >= 0 { set(newValue, "electricityPrice") } }
+    }
+    /// Currency sign shown next to the price ("$", "€" ...), from the system region.
+    var currencySymbol: String { Locale.current.currencySymbol ?? "$" }
+
     var unit: TempUnit {
         switch unitChoice {
         case 1: return .fahrenheit
