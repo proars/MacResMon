@@ -1,6 +1,6 @@
 {
   "name": "macresmon",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native macOS app for Apple Silicon Macs: CPU, GPU, memory, fan speed, temperature, power, battery, disk, network and top processes, with a menu-bar readout, overheating alerts, and a persistent report of power use and temperature spikes",
   "license": "MIT",
   "private": true,
