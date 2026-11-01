@@ -24,13 +24,28 @@ See memory usage, power consumption, battery status, disk activity, network spee
 
 *The Reports tab (demo data): power use and cost per day, and the temperature spike log. [Light screenshot](docs/reports-light.png) · [Dark screenshot](docs/reports-dark.png).*
 
-[Features](#features) · [Build and run](#build-and-run) · [FAQ](#faq) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
+**[⬇ Download MacResMon.dmg](https://github.com/proars/MacResMon/releases/latest/download/MacResMon.dmg)** · [all releases](https://github.com/proars/MacResMon/releases)
+
+[Download and install](#download-and-install) · [Features](#features) · [Build and run](#build-and-run) · [FAQ](#faq) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
 
 ## Why MacResMon?
 
 When your MacBook Pro gets hot or its fans spin up, check temperatures, fan RPM, CPU and GPU load, power draw, and the busiest processes together. Keep the live CPU and temperature readout in the macOS menu bar, then open the dashboard for a closer look.
 
 MacResMon monitors your Mac; it does not change fan speeds, CPU settings, or thermal limits.
+
+## Download and install
+
+1. Download **[MacResMon.dmg](https://github.com/proars/MacResMon/releases/latest/download/MacResMon.dmg)** from the [latest release](https://github.com/proars/MacResMon/releases/latest). It needs an Apple Silicon Mac with macOS 13 or later.
+2. Open the disk image and drag **MacResMon** onto the **Applications** shortcut.
+3. Open MacResMon from Applications (or Launchpad). The first time, macOS may say it cannot verify the app, because it is signed ad hoc and not notarized by Apple. Open **System Settings → Privacy & Security**, scroll to the message about MacResMon and click **Open Anyway**, then confirm. This is needed only once.
+4. Optional: open **Settings** (⌘, or the gear button) and switch on **Launch at login**; choose what the menu-bar readout shows.
+
+If macOS still refuses to open the app, remove the download quarantine flag in Terminal and open it again: `xattr -dr com.apple.quarantine /Applications/MacResMon.app`.
+
+To check the download, compare `shasum -a 256 MacResMon.dmg` with the SHA-256 in the release notes. To remove the app, quit it and delete it from Applications; its data is the report log in `~/Library/Application Support/MacResMon/` and its settings (`defaults delete com.macresmon.app`).
+
+You can also [build it from source](#build-and-run).
 
 ## Features
 
@@ -49,9 +64,9 @@ MacResMon monitors your Mac; it does not change fan speeds, CPU settings, or the
 
 ## Requirements
 
-An **Apple Silicon Mac running macOS Ventura 13 or later** is required. Intel Macs are unsupported. Available sensor readings depend on your Mac model and macmon; fanless Macs have no fan RPM to report. Testing so far has been on one Apple Silicon MacBook Pro, so reports from other models are welcome.
+An **Apple Silicon Mac running macOS Ventura 13 or later** is required to run the app. Intel Macs are unsupported. Available sensor readings depend on your Mac model and macmon; fanless Macs have no fan RPM to report. Testing so far has been on one Apple Silicon MacBook Pro, so reports from other models are welcome.
 
-To build from source, install:
+To build from source (not needed for the downloaded app), install:
 
 | Tool | Needed for | Install |
 | --- | --- | --- |
@@ -62,7 +77,7 @@ To build from source, install:
 
 ## Build and run
 
-Clone this repository using GitHub’s **Code → HTTPS** URL, or choose **Download ZIP** and extract it. Open Terminal in the project folder, then run:
+To build it yourself instead of downloading the release, clone this repository using GitHub’s **Code → HTTPS** URL, or choose **Download ZIP** and extract it. Open Terminal in the project folder, then run:
 
 ```bash
 npm install                               # once
@@ -72,40 +87,9 @@ open "native/build/MacResMon.app"
 
 The build packs the interface, the Swift app and a copy of `macmon` into one app of about 4 MB. Copy it to `/Applications` if you like, and rebuild with the same command after changing any code.
 
-The build signs the app ad hoc, without Developer ID signing or notarization. A downloaded or AirDropped copy may be blocked by Gatekeeper on another Mac. If you trust the source, try opening it, then use **System Settings → Privacy & Security → Open Anyway** if macOS offers that option. Developer ID signing and notarization are planned for distribution.
+How the build works, how to make a `.dmg`, the checks and the architecture are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-### What `build.sh` does
-
-`npm run native:build` runs `native/build.sh`, which stops at the first error (`set -euo pipefail`) and works in these steps:
-
-1. Finds `macmon`: `$MACMON_BIN` if set, otherwise the one on your `PATH`. Without it the script exits with a hint to run `brew install macmon`.
-2. Builds the interface (`npm run build`, output in `dist/`).
-3. Builds the Swift app in release mode (`swift build -c release`).
-4. Assembles `native/build/MacResMon.app`. The old bundle is deleted first. It holds the executable, `dist/`, the icon (`Resources/AppIcon.icns`, drawn by `Tools/make-icon.sh` only if missing), `macmon` in `Contents/Resources/bin`, the license notices of macmon and of this project, and an `Info.plist` written by the script (bundle ID `com.macresmon.app`, minimum macOS 13, version taken from `package.json`).
-5. Signs the bundle ad hoc (`codesign --sign -`).
-
-Run it from anywhere; it changes into `native/` itself. To use a different macmon: `MACMON_BIN=/path/to/macmon npm run native:build`.
-
-### Make a .dmg
-
-After `npm run native:build`, pack the app into a disk image with `hdiutil` (part of macOS):
-
-```bash
-mkdir -p native/build/dmg
-cp -R "native/build/MacResMon.app" native/build/dmg/
-ln -s /Applications native/build/dmg/Applications     # drag-to-install shortcut
-hdiutil create -volname "MacResMon" -srcfolder native/build/dmg \
-  -ov -format UDZO native/build/MacResMon.dmg
-rm -rf native/build/dmg
-```
-
-The result is `native/build/MacResMon.dmg`. Newer macOS versions print a warning that `hdiutil create` is deprecated; it still works. Apple's replacement, `diskutil image`, may not exist on older macOS versions, so the steps above use `hdiutil`. Where `diskutil image` is available you can use it instead of the `hdiutil create` line (same folder; delete an old `MacResMon.dmg` first, it does not overwrite):
-
-```bash
-diskutil image create from --format UDZO --volumeName MacResMon native/build/dmg native/build/MacResMon.dmg
-```
-
-The image carries the same ad-hoc signature as the app, so the first-launch warning described above applies on other Macs.
+The build signs the app ad hoc, without Developer ID signing or notarization. A downloaded or AirDropped copy may be blocked by Gatekeeper on another Mac; the steps are under [Download and install](#download-and-install). Developer ID signing and notarization are planned for distribution.
 
 ## Using the app
 
@@ -118,37 +102,7 @@ The image carries the same ad-hoc signature as the app, so the first-launch warn
 
 ## How it works
 
-```
-macmon (child process)       ┐
-ps · pmset · df              ├─> Swift Sampler/Monitor ──(1 s by default)──> window.__nativeHub ──> React UI in a WKWebView
-getifaddrs · IOKit (counters)┘        │
-                                      ├─> menu-bar item, alert notifications
-                                      └─> reports.json (power per day, temperature spikes) <─> Reports tab
-```
-
-The Swift side reads [macmon](https://github.com/vladkens/macmon) (CPU, GPU, power, temperatures, fans, memory), a few macOS tools (processes, battery, disk space) and direct system counters (network, disk I/O). Once per update interval (1 second by default, set in Settings) it builds one snapshot, keeps the last 60 samples, feeds the menu bar and notifications, and pushes the snapshot into the page. Each tick also feeds the report log (see `ReportStore`), which is saved to `~/Library/Application Support/MacResMon/reports.json` every 30 seconds, when a spike starts or ends, and on quit (at most the newest 5000 spikes are kept; days are kept until you reset). The Reports tab asks the app for the log through `window.__native.request(...)` (the page's only way to call the app: `reports.get`, the CSV exports and `reports.reset`, `settings.open` for the gear button, and `state.set` to remember the theme, tab and report period) and the app answers, opens the save dialog for CSV export and asks before erasing. The interface is a small React app drawn with plain SVG (no chart library), built with Vite and bundled into the app; the page is only fed while the window is visible.
-
-```
-native/   Swift package: MonitorCore (parsers, snapshot, alert rules, report log and CSV) · MacResMon (window, menu bar,
-          notifications, settings, report storage) · CoreChecks (unit checks) · build.sh · Tools/make-icon
-src/      the React interface (cards, hooks, header alert chips, Reports tab)
-docs/     README screenshots (demo readings, not real data)
-```
-
-## Development
-
-| Command | What it does |
-| --- | --- |
-| `npm run native:build` | builds the interface and the app |
-| `npm run build && npm run native:dev` | runs the app without packaging (uses `dist/` and the `macmon` in `/opt/homebrew/bin` or `/usr/local/bin`; notifications and launch at login need the real app) |
-| `npm test` | interface logic: formatters, alert rules and report rows |
-| `npm run native:check` | the Swift parsers, snapshot builder, alert rules and report log (no Xcode needed) |
-| `node rendercheck.mjs` | renders every component server-side as a smoke test |
-| `npm run native:icon` | redraws the app icon |
-
-Checks without looking at the screen: run the app binary with `--screenshot FILE` (PNG of the window), `--screenshot-settings FILE` or `--dump-status` (prints the menu-bar title and rows); `--background` starts it like a login item. Environment variables: `MACMON_BIN` (path to macmon) and `MONITOR_DIST` (path to a built interface).
-
-Repository metadata and release notes are covered under [Publishing on GitHub](#publishing-on-github).
+A Swift app reads the sensors through [macmon](https://github.com/vladkens/macmon) (bundled in the app) and a few macOS tools, once per update interval (1 second by default). It shows the readings in a window (a React interface in a WKWebView), in the menu bar and in notifications. Once per tick it also feeds the report log, a small file in `~/Library/Application Support/MacResMon/`. Nothing is sent over the network. Details for developers are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## FAQ
 
@@ -168,7 +122,7 @@ No. Sensor data comes from [macmon](https://github.com/vladkens/macmon), which r
 No. macmon supports Apple Silicon only, and the app has no other sensor source, so it does not work on Intel Macs. Support would need a separate reader for Intel (temperatures and fans through the SMC); it is not planned yet.
 
 **Is it on the Mac App Store?**
-No. The current installation path is to build the app from source using the instructions above.
+No. Download the `.dmg` from the [releases page](https://github.com/proars/MacResMon/releases) (see [Download and install](#download-and-install)) or build the app from source.
 
 **Is my data sent anywhere?**
 No. The app has no server and makes no network connections; everything stays on your Mac. The only file it writes is the report log, `~/Library/Application Support/MacResMon/reports.json`; delete it or use Reset to erase it.
@@ -192,7 +146,7 @@ It was developed and tested on a single Apple Silicon MacBook Pro. Reports for o
 
 Bug reports, model compatibility reports, and pull requests are welcome. Open an issue in this repository with your Mac model and chip, macOS version, macmon version (`macmon --version`), steps to reproduce, and any relevant error output. Remove private information from logs or screenshots before sharing.
 
-For code changes, run the checks from the [Development](#development) table (`npm test`, `npm run build`, `node rendercheck.mjs`, and `npm run native:check` when touching `native/`). Keep Swift and JavaScript alert rules in sync. If you change the snapshot contract, update both the native collector and the React interface.
+For code changes, run the checks listed in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (`npm test`, `npm run build`, `node rendercheck.mjs`, and `npm run native:check` when touching `native/`). Keep Swift and JavaScript alert rules in sync. If you change the snapshot contract, update both the native collector and the React interface.
 
 ## Troubleshooting
 
@@ -203,33 +157,6 @@ For code changes, run the checks from the [Development](#development) table (`np
 - **The menu-bar item is missing**: it is switched off in Settings, or the menu bar is full (the item can hide behind the notch or other icons).
 - **The build prints `ld: warning: search path '/Library/Developer/CommandLineTools/Developer/...' not found`** (five lines): the app is built correctly, but SwiftPM 6's default build engine adds the platform folders of a full Xcode (`<developer dir>/Developer/Library/Frameworks` and `<developer dir>/Developer/usr/lib`) and with only the Command Line Tools those two folders do not exist. Create them once (admin password; the folders are lost when the Command Line Tools are updated, then run it again): `sudo mkdir -p /Library/Developer/CommandLineTools/Developer/Library/Frameworks /Library/Developer/CommandLineTools/Developer/usr/lib`. Installing full Xcode does the same. Do not silence the linker (`-Xlinker -w`) and do not use the deprecated `--build-system native`.
 - **The build fails**: check that `macmon` is installed (`which macmon`), Swift works (`swift --version`) and `npm install` has been run.
-
-## Publishing on GitHub
-
-<details>
-<summary>Repository description, topics, social preview, and releases</summary>
-
-Use `MacResMon` as the repository name. In **About → Edit repository metadata**, set this description:
-
-```text
-Free, open-source macOS system monitor for Apple Silicon. Track CPU/GPU usage, temperatures, fan speed (RPM), memory, power, battery, disk and network, with a live menu bar readout. Swift + React, no sudo.
-```
-
-Add these topics individually in the same editor:
-
-```text
-macos apple-silicon system-monitor hardware-monitor performance-monitor
-menu-bar temperature-monitor fan-speed cpu-monitor gpu-monitor
-memory-monitor power-monitor battery-monitor swift react wkwebview macmon
-```
-
-GitHub's default repository search uses the name, description, and topics; README content is searchable with `in:readme`. These settings must be applied on GitHub separately from this file. See [GitHub's repository search documentation](https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories). Only set a website URL if the project has a website.
-
-For a shared-link preview, upload a 1280 × 640 PNG or JPG under 1 MB in **Settings → General → Social preview**. Include the MacResMon name, “macOS System Monitor for Apple Silicon,” and a readable dashboard crop on a solid background. Label demo readings. See [GitHub's social preview documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview).
-
-Enable Issues for bug and model compatibility reports. Publish source with the MIT license and the README screenshots in `docs/`; keep generated build folders out of commits. For downloadable builds, attach the DMG to a versioned GitHub Release and document supported hardware, build provenance, and signing/notarization status. Add a README download link once the release asset is available.
-
-</details>
 
 ## Star history
 
